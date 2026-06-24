@@ -330,16 +330,3 @@ npx tsx src/index.ts revoke --delegation <id>
 | 9.6 | Idempotency keys | ✅ |
 
 See the [full spec](https://docs.nevermined.app/specs/x402/card-delegation) for details.
-
----
-
-## License
-
-MIT
-
----
-
-<p align="center">
-  Built by <a href="https://harishkotra.me">Harish Kotra</a> ·
-  Check out my other builds at <a href="https://dailybuild.xyz">dailybuild.xyz</a>
-</p>
