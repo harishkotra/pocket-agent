@@ -368,6 +368,7 @@ app.post<{ Body: { x402AccessToken: string; maxAmount: string } }>(
     return await withLock(del.delegationId, async () => {
       let currentBalance = await getCreditBalance(storedAddress);
       let orderTx: string | undefined;
+      let autoRefilled = false;
 
       if (currentBalance < creditsRequested) {
         if (del.provider === 'erc4337') {
@@ -421,6 +422,7 @@ app.post<{ Body: { x402AccessToken: string; maxAmount: string } }>(
           const mintTx = await mintCredits(storedAddress, mintedCredits);
           currentBalance = await getCreditBalance(storedAddress);
           console.log(`  [facilitator] On-chain mint: ${mintTx}, new balance: ${currentBalance}`);
+          autoRefilled = true;
         } catch (err: any) {
           return settleErr('MINT_FAILED',
             `Credit minting failed after successful card charge: ${err.message}`,
@@ -428,7 +430,9 @@ app.post<{ Body: { x402AccessToken: string; maxAmount: string } }>(
         }
       }
 
-      if (currentBalance < creditsRequested) {
+      // Skip INSUFFICIENT_BALANCE check if we just minted (avoids false positive
+      // from Base Sepolia stale RPC returning 0 right after mint)
+      if (!autoRefilled && currentBalance < creditsRequested) {
         return settleErr('INSUFFICIENT_BALANCE',
           `Credit balance ${currentBalance} is insufficient for requested ${creditsRequested} credits`,
           del.provider);
