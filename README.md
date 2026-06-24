@@ -12,6 +12,8 @@ Bank Account
 
 When on-chain credits run low, the delegated card auto-charges and mints more. The agent never touches the card directly.
 
+<img width="1317" height="1122" alt="Screenshot at Jun 24 23-51-44" src="https://github.com/user-attachments/assets/08391252-217d-45a3-aaac-d89476de3906" />
+
 ---
 
 ## How This Implements the x402 Delegation Extension
