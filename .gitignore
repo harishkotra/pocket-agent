@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+artifacts/
+cache/
+typechain-types/
+coverage/
+
+# Environment / secrets
+.env
+.env.local
+.env.production
+.env.staging
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Planning docs (not needed in version control)
+IMPLEMENTATION_PLAN.md
+PROGRESS.md
+NOTES.md
+TODO.md
+PLAN*.md
+PLANNING*.md
+BLOG*.md
+
+# Social / post files (not for version control)
+X_THREAD*.md
+LINKEDIN*.md
+POST*.md
+SOCIAL*.md
+TWEET*.md
+
+# Temp files
+temp/
+tmp/
+.tmp/

@@ -1,0 +1,33 @@
+{
+  "name": "pocket-agent",
+  "version": "0.1.0",
+  "description": "Pocket money for your AI agents — Nevermined x402 delegation extension demo",
+  "type": "module",
+  "scripts": {
+    "start": "concurrently -n fac,agent -c blue,green \"npm run facilitator\" \"npm run agent-server\"",
+    "demo": "tsx src/demo.ts",
+    "facilitator": "tsx src/facilitator/mock-server.ts",
+    "agent-server": "tsx src/agent-server/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "commander": "^12.0.0",
+    "dotenv": "^16.4.0",
+    "fastify": "^5.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "stripe": "^17.0.0",
+    "viem": "^2.0.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "concurrently": "^10.0.3",
+    "hardhat": "^3.9.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0"
+  }
+}

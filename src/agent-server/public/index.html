@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PocketAgent — x402 Demo</title>
+<script type="importmap">
+{
+  "imports": {
+    "viem": "https://esm.sh/viem@2.53.1",
+    "viem/chains": "https://esm.sh/viem@2.53.1/chains"
+  }
+}
+</script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131a;
+  --border: #1e1e2a;
+  --text: #c8c8d4;
+  --dim: #6b6b80;
+  --accent: #6c5ce7;
+  --green: #00d68f;
+  --red: #ff6b6b;
+  --yellow: #ffd93d;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, monospace;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1rem;
+}
+.container { max-width: 720px; width: 100%; }
+
+header { text-align: center; margin-bottom: 2rem; }
+header h1 {
+  font-size: 1.8rem; font-weight: 700;
+  color: #fff;
+}
+header p { color: var(--dim); font-size: 0.9rem; margin-top: 0.3rem; }
+
+.wallet-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 0.8rem 1.2rem; margin-bottom: 1.5rem;
+}
+.wallet-bar .addr { font-family: monospace; font-size: 0.85rem; color: var(--dim); }
+.wallet-bar .balance { font-size: 0.9rem; font-weight: 600; color: var(--green); }
+.btn {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 0.5rem 1.2rem; font-size: 0.85rem;
+  cursor: pointer; font-weight: 600; transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-sm { padding: 0.35rem 0.9rem; font-size: 0.8rem; }
+.btn-outline {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+}
+.btn-outline:hover { background: var(--surface); border-color: var(--accent); }
+
+.step {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.2rem; margin-bottom: 0.8rem;
+  transition: border-color 0.3s;
+}
+.step.active { border-color: var(--accent); }
+.step.done { border-color: var(--green); }
+.step-header {
+  display: flex; align-items: center; gap: 0.8rem;
+  cursor: pointer; user-select: none;
+}
+.step-num {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: var(--border); display: flex; align-items: center;
+  justify-content: center; font-size: 0.8rem; font-weight: 700;
+  flex-shrink: 0; transition: background 0.3s;
+}
+.step.active .step-num { background: var(--accent); }
+.step.done .step-num { background: var(--green); }
+.step-title { font-weight: 600; font-size: 0.95rem; }
+.step-desc { color: var(--dim); font-size: 0.8rem; margin-top: 0.2rem; }
+.step-body { margin-top: 1rem; display: none; }
+.step.active .step-body { display: block; }
+.field {
+  margin-bottom: 0.8rem;
+}
+.field label {
+  display: block; font-size: 0.8rem; color: var(--dim);
+  margin-bottom: 0.3rem; font-weight: 500;
+}
+.field input, .field select {
+  width: 100%; padding: 0.6rem 0.8rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  color: var(--text); font-size: 0.85rem; font-family: monospace;
+}
+.field input:focus { outline: none; border-color: var(--accent); }
+
+.log {
+  background: #050508; border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.6rem;
+  font-family: monospace; font-size: 0.8rem; margin-top: 0.6rem;
+  max-height: 140px; overflow-y: auto; line-height: 1.5;
+}
+.log .ok { color: var(--green); }
+.log .err { color: var(--red); }
+.log .info { color: var(--dim); }
+.log .data { color: var(--yellow); word-break: break-all; }
+
+.summary {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.2rem; margin-top: 1rem;
+  display: none;
+}
+.summary.show { display: block; }
+.summary h3 { margin-bottom: 0.5rem; }
+.summary .row { display: flex; justify-content: space-between; padding: 0.3rem 0; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+.summary .row:last-child { border: none; }
+.summary .label { color: var(--dim); }
+.summary .value { font-family: monospace; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>PocketAgent</h1>
+  <p>Pocket money for your AI agents — x402 Delegation Demo</p>
+</header>
+
+<div class="wallet-bar">
+  <div>
+    <div class="addr" id="walletAddr">Not connected</div>
+    <div class="balance" id="walletBalance" style="color:var(--dim)">— credits</div>
+  </div>
+  <button class="btn" id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
+</div>
+
+<div id="steps">
+  <div class="step active" data-step="1">
+    <div class="step-header" onclick="toggleStep(1)">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-title">Enroll a test card</div>
+        <div class="step-desc">Register a Visa test card via Stripe</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p style="font-size:0.85rem;color:var(--dim);margin-bottom:0.8rem">
+        This enrolls the Stripe test card <code style="color:#fff">4242 4242 4242 4242</code> under your wallet.
+      </p>
+      <button class="btn btn-sm" id="enrollBtn" onclick="enrollCard()">Enroll Card</button>
+      <div class="log" id="enrollLog"></div>
+    </div>
+  </div>
+
+  <div class="step" data-step="2">
+    <div class="step-header" onclick="toggleStep(2)">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-title">Create delegation</div>
+        <div class="step-desc">Set the budget and duration for the agent</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="field">
+        <label for="delLimit">Spending limit (USD cents, e.g. 10000 = $100)</label>
+        <input type="number" id="delLimit" value="10000">
+      </div>
+      <div class="field">
+        <label for="delDuration">Duration (seconds, e.g. 604800 = 7 days)</label>
+        <input type="number" id="delDuration" value="604800">
+      </div>
+      <button class="btn btn-sm" id="delegationBtn" onclick="createDelegation()" disabled>Create Delegation</button>
+      <div class="log" id="delegationLog"></div>
+    </div>
+  </div>
+
+  <div class="step" data-step="3">
+    <div class="step-header" onclick="toggleStep(3)">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-title">Get x402 access token</div>
+        <div class="step-desc">Request a signed JWT from the facilitator</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <button class="btn btn-sm" id="tokenBtn" onclick="getToken()" disabled>Get Token</button>
+      <div class="log" id="tokenLog"></div>
+    </div>
+  </div>
+
+  <div class="step" data-step="4">
+    <div class="step-header" onclick="toggleStep(4)">
+      <div class="step-num">4</div>
+      <div>
+        <div class="step-title">Invoke AI agent</div>
+        <div class="step-desc">Call the x402-protected endpoint</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="field">
+        <label for="agentPrompt">Prompt for the agent</label>
+        <input type="text" id="agentPrompt" value="Summarize the quarterly report">
+      </div>
+      <button class="btn btn-sm" id="invokeBtn" onclick="invokeAgent()" disabled>Invoke Agent</button>
+      <div class="log" id="invokeLog"></div>
+    </div>
+  </div>
+
+  <div class="step" data-step="5">
+    <div class="step-header" onclick="toggleStep(5)">
+      <div class="step-num">5</div>
+      <div>
+        <div class="step-title">Auto top-up</div>
+        <div class="step-desc">Exhaust credits and trigger a card charge</div>
+      </div>
+    </div>
+    <div class="step-body">
+      <p style="font-size:0.85rem;color:var(--dim);margin-bottom:0.8rem">
+        Runs the agent repeatedly until on-chain credits hit zero, then the card is charged for $5 and new credits are minted.
+      </p>
+      <button class="btn btn-sm" id="drainBtn" onclick="drainAndTopUp()">Drain &amp; Top-Up</button>
+      <div class="log" id="drainLog"></div>
+    </div>
+  </div>
+</div>
+
+<div class="summary" id="summary">
+  <h3>Demo Complete</h3>
+  <div class="row"><span class="label">Wallet</span><span class="value" style="font-size:0.75rem" id="summaryWallet">—</span></div>
+  <div class="row"><span class="label">Delegation limit</span><span class="value" id="summaryLimit">—</span></div>
+  <div class="row"><span class="label">On-chain credits</span><span class="value" id="summaryBalance">—</span></div>
+  <div class="row"><span class="label">Agent invocations</span><span class="value" id="summaryCount">0</span></div>
+  <div class="row"><span class="label">Delegation ID</span><span class="value" style="font-size:0.75rem" id="summaryDelegation">—</span></div>
+  <div class="row"><span class="label">Card charged</span><span class="value" id="summaryCardTx">—</span></div>
+</div>
+
+<script>
+const state = {
+  walletAddress: null,
+  customerId: null,
+  paymentMethodId: null,
+  delegationId: null,
+  accessToken: null,
+  creditBalance: 0,
+  invokeCount: 0,
+  lastOrderTx: '',
+};
+
+let FACILITATOR = 'http://localhost:3020';
+let AGENT = 'http://localhost:3010';
+let CREDIT_TOKEN = '';
+let RPC_URL = 'https://sepolia.base.org';
+
+const configReady = fetch('/api/config').then(r => r.json()).then(cfg => {
+  FACILITATOR = cfg.facilitatorUrl;
+  CREDIT_TOKEN = cfg.creditTokenAddress;
+  RPC_URL = cfg.rpcUrl;
+}).catch(() => {});
+
+// ================================================================
+// Wallet
+// ================================================================
+async function connectWallet() {
+  await configReady;
+  if (!window.ethereum) {
+    alert('MetaMask not found. Install from metamask.io');
+    return;
+  }
+  try {
+    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+    state.walletAddress = accounts[0];
+    document.getElementById('walletAddr').textContent =
+      state.walletAddress.slice(0, 6) + '...' + state.walletAddress.slice(-4);
+    document.getElementById('connectBtn').textContent = 'Connected';
+    document.getElementById('connectBtn').classList.add('btn-outline');
+    document.getElementById('connectBtn').disabled = true;
+
+    await refreshBalance();
+    enableStep(2);
+  } catch (e) {
+    alert(`Wallet connection failed: ${e.message}`);
+  }
+}
+
+async function refreshBalance() {
+  if (!state.walletAddress) return;
+  if (!CREDIT_TOKEN) {
+    document.getElementById('walletBalance').textContent = 'no contract';
+    return;
+  }
+  // Encode balanceOf(address) as eth_call via MetaMask
+  const data = '0x70a08231' + state.walletAddress.slice(2).toLowerCase().padStart(64, '0');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const hex = await ethereum.request({
+        method: 'eth_call',
+        params: [{ to: CREDIT_TOKEN, data }, 'latest'],
+      });
+      // eth_call returns '0x' for zero — BigInt rejects '0x', needs '0x0'
+      const raw = (hex || '0x0') === '0x' ? '0x0' : (hex || '0x0');
+      const formatted = Number(BigInt(raw)) / 1e18;
+      if (formatted > 0 || attempt === 2) {
+        state.creditBalance = formatted;
+        document.getElementById('walletBalance').textContent =
+          `${formatted.toLocaleString(undefined, {maximumFractionDigits: 0})} credits`;
+        document.getElementById('walletBalance').style.color = 'var(--green)';
+        return;
+      }
+      await new Promise(r => setTimeout(r, 1500));
+    } catch (e) {
+      if (attempt === 2) {
+        document.getElementById('walletBalance').textContent = '? credits';
+        document.getElementById('walletBalance').style.color = 'var(--dim)';
+      }
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  }
+}
+
+// ================================================================
+// Step helpers
+// ================================================================
+function toggleStep(n) {
+  const el = document.querySelector(`[data-step="${n}"]`);
+  if (el.classList.contains('done')) return;
+  el.classList.toggle('active');
+}
+function enableStep(n) {
+  const el = document.querySelector(`[data-step="${n}"]`);
+  el.classList.add('active');
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function completeStep(n) {
+  const el = document.querySelector(`[data-step="${n}"]`);
+  el.classList.remove('active');
+  el.classList.add('done');
+}
+function log(id, msg, type = 'info') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const d = document.createElement('div');
+  d.className = type;
+  d.textContent = `→ ${msg}`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+function clearLog(id) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = '';
+}
+
+// ================================================================
+// Step 1 — Enroll Card
+// ================================================================
+async function enrollCard() {
+  clearLog('enrollLog');
+  const btn = document.getElementById('enrollBtn');
+  btn.disabled = true;
+  btn.textContent = 'Enrolling...';
+
+  try {
+    log('enrollLog', 'Enrolling Stripe test card (pm_card_visa)...', 'info');
+    const r = await fetch(`${FACILITATOR}/payments/card/enroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const raw = await r.text();
+    if (!r.ok) throw new Error(`HTTP ${r.status}: ${raw.slice(0, 300)}`);
+    const d = JSON.parse(raw);
+    const { customerId, paymentMethodId } = d;
+    state.customerId = customerId;
+    state.paymentMethodId = paymentMethodId;
+    log('enrollLog', `Customer: ${customerId}`, 'ok');
+    log('enrollLog', `Payment method: ${paymentMethodId}`, 'ok');
+
+    completeStep(1);
+    enableStep(2);
+    document.getElementById('delegationBtn').disabled = false;
+  } catch (e) {
+    log('enrollLog', `Error: ${e.message}`, 'err');
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+}
+
+// ================================================================
+// Step 2 — Create Delegation
+// ================================================================
+async function createDelegation() {
+  clearLog('delegationLog');
+  const btn = document.getElementById('delegationBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+
+  try {
+    const limit = parseInt(document.getElementById('delLimit').value);
+    const duration = parseInt(document.getElementById('delDuration').value);
+
+    log('delegationLog', `Wallet: ${state.walletAddress}`, 'info');
+    log('delegationLog', `Limit: $${(limit/100).toFixed(2)} for ${(duration/86400).toFixed(1)} days`, 'info');
+
+    const res = await fetch(`${FACILITATOR}/api/v1/delegation/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'stripe',
+        subscriberAddress: state.walletAddress,
+        providerCustomerId: state.customerId,
+        spendingLimitCents: limit,
+        durationSecs: duration,
+        providerPaymentMethodId: state.paymentMethodId,
+        currency: 'usd',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(String(data.message || data.error || JSON.stringify(data)));
+    state.delegationId = data.delegationId;
+    log('delegationLog', `Delegation ID: ${data.delegationId}`, 'ok');
+    log('delegationLog', `Session key hash: ${(data.sessionKeyHash||'').slice(0,20)}...`, 'data');
+
+    completeStep(2);
+    enableStep(3);
+    document.getElementById('tokenBtn').disabled = false;
+  } catch (e) {
+    log('delegationLog', `Error: ${e.message}`, 'err');
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+}
+
+// ================================================================
+// Step 3 — Get x402 Token
+// ================================================================
+async function getToken() {
+  clearLog('tokenLog');
+  const btn = document.getElementById('tokenBtn');
+  btn.disabled = true;
+  btn.textContent = 'Requesting...';
+
+  try {
+    log('tokenLog', 'Requesting x402 permissions JWT...', 'info');
+    const res = await fetch(`${FACILITATOR}/x402/permissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resource: {
+          url: '/api/v1/agents/agent-1/tasks',
+          description: 'AI agent task execution',
+          mimeType: 'application/json',
+        },
+        accepted: {
+          scheme: 'nvm:card-delegation',
+          network: 'stripe',
+          extra: { version: '1' },
+        },
+        delegationConfig: { delegationId: state.delegationId },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(String(data.message || data.error || JSON.stringify(data)));
+    }
+    if (!data.accessToken) {
+      throw new Error('Response missing accessToken');
+    }
+    state.accessToken = data.accessToken;
+    log('tokenLog', 'PAYMENT-SIGNATURE token acquired', 'ok');
+
+    completeStep(3);
+    enableStep(4);
+    document.getElementById('invokeBtn').disabled = false;
+  } catch (e) {
+    log('tokenLog', `Error: ${e.message}`, 'err');
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  }
+}
+
+// ================================================================
+// Step 4 — Invoke Agent
+// ================================================================
+async function invokeAgent() {
+  clearLog('invokeLog');
+  const btn = document.getElementById('invokeBtn');
+  btn.disabled = true;
+  btn.textContent = 'Invoking...';
+
+  try {
+    const prompt = document.getElementById('agentPrompt').value || 'Hello';
+    log('invokeLog', `Prompt: "${prompt.slice(0, 60)}"`, 'info');
+
+    const res = await fetch(`${AGENT}/api/v1/agents/agent-1/tasks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'PAYMENT-SIGNATURE': state.accessToken,
+      },
+      body: JSON.stringify({ prompt, maxCredits: 5 }),
+    });
+
+    const pmt = res.headers.get('PAYMENT-RESPONSE');
+    const data = await res.json();
+    let receipt = null;
+    if (pmt) receipt = JSON.parse(atob(pmt));
+
+    if (receipt && receipt.success) {
+      state.invokeCount++;
+      log('invokeLog',
+        `+${receipt.creditsRedeemed} credits | ${receipt.remainingBalance} remaining`, 'ok');
+      log('invokeLog', `Result: ${(data.result||'').slice(0, 100)}`, 'data');
+      await refreshBalance();
+
+      if (!document.querySelector('[data-step="5"].done')) {
+        completeStep(4);
+        enableStep(5);
+      }
+    } else {
+      log('invokeLog', `Error: ${data.error?.message || data.error || 'unknown'}`, 'err');
+    }
+  } catch (e) {
+    log('invokeLog', `Error: ${e.message}`, 'err');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Invoke Again';
+}
+
+// ================================================================
+// Step 5 — Drain & Top-Up
+// ================================================================
+async function drainAndTopUp() {
+  clearLog('drainLog');
+  const btn = document.getElementById('drainBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  for (let i = 0; i < 30; i++) {
+    try {
+      const res = await fetch(`${AGENT}/api/v1/agents/agent-1/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'PAYMENT-SIGNATURE': state.accessToken,
+        },
+        body: JSON.stringify({ prompt: `Drain request ${i+1}`, maxCredits: 5 }),
+      });
+
+      const pmt = res.headers.get('PAYMENT-RESPONSE');
+      const data = await res.json();
+      let receipt = null;
+      if (pmt) receipt = JSON.parse(atob(pmt));
+
+      if (receipt && receipt.success) {
+        state.invokeCount++;
+        state.lastOrderTx = receipt.orderTx || state.lastOrderTx;
+        log('drainLog',
+          `Used ${receipt.creditsRedeemed} → ${receipt.remainingBalance} left`, 'info');
+        if (parseInt(receipt.remainingBalance) === 0) {
+          log('drainLog', 'Credits exhausted', 'ok');
+        }
+      } else if (receipt && receipt.orderTx) {
+        state.lastOrderTx = receipt.orderTx;
+        log('drainLog', `Top-up triggered! Card charged: ${receipt.orderTx}`, 'ok');
+        log('drainLog', `New balance: ${receipt.remainingBalance}`, 'ok');
+        break;
+      } else {
+        log('drainLog',
+          `Error: ${data.error?.message || data.error || 'settle failed'}`, 'err');
+        break;
+      }
+    } catch (e) {
+      log('drainLog', `Error: ${e.message}`, 'err');
+      break;
+    }
+  }
+
+  await refreshBalance();
+  log('drainLog', `Done — ${state.invokeCount} total invocations`, 'ok');
+
+  document.getElementById('summaryWallet').textContent = state.walletAddress;
+  document.getElementById('summaryLimit').textContent =
+    `$${(parseInt(document.getElementById('delLimit').value)/100).toFixed(2)}`;
+  document.getElementById('summaryBalance').textContent =
+    `${state.creditBalance.toLocaleString(undefined, {maximumFractionDigits: 0})} credits`;
+  document.getElementById('summaryCount').textContent = `${state.invokeCount}`;
+  document.getElementById('summaryDelegation').textContent = state.delegationId;
+  document.getElementById('summaryCardTx').textContent = state.lastOrderTx || 'none';
+
+  document.getElementById('summary').classList.add('show');
+  btn.disabled = false;
+  btn.textContent = 'Done';
+  completeStep(5);
+}
+</script>
+</div>
+</body>
+</html>
